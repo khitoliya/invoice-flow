@@ -12,6 +12,8 @@ import com.dollyplastic.invoiceapp.domain.Utils.FinancialYearUtils
 data class InvoiceFormState(
 
     /* HEADER */
+    val isEditing: Boolean = false,
+    val invoiceId: String? = null,
     val invoiceNumber: String = "",
     val invoiceSequence: Int = 0,
     val invoiceDate: String = DateUtils.today(),
@@ -42,13 +44,31 @@ data class InvoiceFormState(
     /* COMPLIANCE FLAGS */
     val generateEInvoice: Boolean = false,
     val generateEWayBill: Boolean = false,
+    val isEWayBillAllowed: Boolean = true,
+    val isEInvoiceAllowed: Boolean = true,
 
     /* VALIDATION */
+    val lastInvoiceDateEpoch: Long? = null,
     val errors: Map<String, String> = emptyMap(),
+    val internalErrors: Map<String, String> = emptyMap(),
 
-    val additionalDetails: AdditionalDetails = AdditionalDetails()
+
+    val additionalDetails: AdditionalDetails = AdditionalDetails(),
+    val isSaving: Boolean = false,
+    val isDistanceReadOnly: Boolean = false,
+    val isGeneratingInvoiceNumber: Boolean = false,
+    val touchedFields: Set<String> = emptySet(),
+    val showAllErrors: Boolean = false
 
 ) {
+    fun getVisibleError(field: String): String? {
+        return if (showAllErrors || touchedFields.contains(field)) {
+            errors[field]
+        } else {
+            null
+        }
+    }
+
     val isFormValid: Boolean
         get() =
             errors.isEmpty() &&
@@ -56,4 +76,5 @@ data class InvoiceFormState(
             invoiceNumber.isNotBlank() &&
             invoiceSequence > 0 &&
             items.isNotEmpty()
+
 }

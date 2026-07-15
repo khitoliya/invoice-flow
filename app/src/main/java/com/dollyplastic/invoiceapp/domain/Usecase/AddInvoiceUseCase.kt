@@ -35,7 +35,8 @@ class AddInvoiceUseCase @Inject constructor(
         val exists = repository.invoiceExists(
             firmGstin = invoice.firm.gstin,
             invoiceNumber = invoice.invoiceNumber,
-            financialYear = fy
+            financialYear = fy,
+            excludeInvoiceId = invoice.invoiceId
         )
 
         if (exists) {
@@ -57,8 +58,12 @@ class AddInvoiceUseCase @Inject constructor(
                 financialYear = fy
             )
 
-        // 4️⃣ Enforce sequence rule
-        if (invoice.invoiceSequence <= lastSequenceUsed) {
+        // 4️⃣ Enforce sequence rule (ONLY for New Invoices)
+        // If editing an existing invoice, we allow keeping the same sequence number (it will be <= lastSequenceUsed)
+        // The Duplicate Check above ensures we don't conflict with *other* invoices.
+        val isEdit = repository.existsById(invoice.invoiceId)
+        
+        if (!isEdit && invoice.invoiceSequence <= lastSequenceUsed) {
             return ValidationResult.Invalid(
                 listOf(
                     ValidationError(

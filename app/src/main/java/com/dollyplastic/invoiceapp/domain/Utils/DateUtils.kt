@@ -11,7 +11,7 @@ object DateUtils {
         DateTimeFormatter.ofPattern("dd-MM-yyyy")
 
     fun today(): String =
-        LocalDate.now().format(DISPLAY_FORMAT)
+        LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).format(DISPLAY_FORMAT)
 
     fun parse(date: String): LocalDate =
         LocalDate.parse(date, DISPLAY_FORMAT)

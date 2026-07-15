@@ -3,6 +3,7 @@ package com.dollyplastic.invoiceapp.pdf
 import android.content.Context
 import android.os.Environment
 import com.dollyplastic.invoiceapp.data.models.Invoice
+import com.dollyplastic.invoiceapp.data.repository.InvoiceStorage
 import com.dollyplastic.invoiceapp.domain.Utils.NumberToWords
 import com.itextpdf.barcodes.BarcodeQRCode
 import com.itextpdf.io.font.constants.StandardFonts
@@ -12,6 +13,7 @@ import com.itextpdf.kernel.font.PdfFontFactory
 import com.itextpdf.kernel.geom.PageSize
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
+import com.dollyplastic.invoiceapp.data.models.TransportMode
 import com.itextpdf.layout.Document
 import com.itextpdf.layout.borders.Border
 import com.itextpdf.layout.borders.SolidBorder
@@ -32,16 +34,18 @@ object InvoicePdfGenerator {
 
     // 1. Android Entry Point (Keeps your app working)
     fun generateForAndroid(context: Context, invoice: Invoice): File {
-        // Android-specific file creation
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        if (!downloadsDir.exists()) downloadsDir.mkdirs()
+        android.util.Log.d("InvoicePdfGenerator", "Generating PDF for: ${invoice.invoiceNumber}. isCashSale=${invoice.isCashSale}, BillTo=${invoice.billToParty?.tradeName}, ShipTo=${invoice.shipToParty?.tradeName}")
+        val pdfFile = InvoiceStorage.getFinalPdfFile(
+            firm = invoice.firm,
+            invoice = invoice
+        )
 
-        val safeNumber = invoice.invoiceNumber.replace("/", "_")
-        val file = File(downloadsDir, "Invoice_$safeNumber.pdf")
+        // Ensure parent exists
+        pdfFile.parentFile?.mkdirs()
 
-        // Call the shared drawing logic
-        drawPdf(file, invoice, context)
-        return file
+        drawPdf(pdfFile, invoice, context)
+
+        return pdfFile
     }
 
     // 2. Shared Drawing Logic (Works on Laptop AND Android)
@@ -59,29 +63,38 @@ object InvoicePdfGenerator {
         )
 
         for ((index, label) in copies.withIndex()) {
+            drawInvoicePage(document, invoice, label, context)
 
-            // 1. Header
-            drawTopHeader(document, invoice, label)
+            // Inject E-Way Bill Page after the FIRST copy (Original for Recipient)
+            if (index == 0 && invoice.generateEWayBill && invoice.eWayBillDetails != null) {
+                document.add(com.itextpdf.layout.element.AreaBreak(AreaBreakType.NEXT_PAGE))
+                drawEWayBillPage(document, invoice)
+            }
 
-            // 2. Main Grid
-            party_InvoiceMeta_Section(document, invoice)
-
-            // 3. Item Table
-            drawItemTable(document, invoice)
-
-            // 4. Tax Summary
-            drawTaxAnalysisTable(document, invoice)
-
-            // 5. Footer
-            drawFooterSection(document, invoice, context)
-
-            // --- PAGE BREAK LOGIC ---
             if (index < copies.size - 1) {
                 document.add(com.itextpdf.layout.element.AreaBreak(AreaBreakType.NEXT_PAGE))
             }
         }
-
+        
         document.close()
+    }
+
+    // Extracted for Reuse by InvoicePdfMerger
+    fun drawInvoicePage(document: Document, invoice: Invoice, copyLabel: String, context: Context?=null) {
+        // 1. Header
+        drawTopHeader(document, invoice, copyLabel)
+
+        // 2. Main Grid
+        party_InvoiceMeta_Section(document, invoice)
+
+        // 3. Item Table
+        drawItemTable(document, invoice)
+
+        // 4. Tax Summary
+        drawTaxAnalysisTable(document, invoice)
+
+        // 5. Footer
+        drawFooterSection(document, invoice, context)
     }
 
     // ==========================================
@@ -223,20 +236,28 @@ object InvoicePdfGenerator {
         // B. CONSIGNEE (Ship To)
         val isCash = invoice.isCashSale
         val consigneeName = if (isCash) "CASH SALE" else (invoice.shipToParty?.tradeName ?: "")
+        // If Cash Sale -> suppress other details
+        val consigneeGstin = if (isCash) "" else (invoice.shipToParty?.gstin ?: "")
+        val consigneeState = if (isCash) "" else (invoice.shipToParty?.state ?: "")
+        val consigneeCode = if (isCash) "" else (invoice.shipToParty?.stateCode ?: "")
+        val consigneeAddr1 = if (isCash) "" else (invoice.shipToParty?.addressLine1 ?: "")
+        val consigneeAddr2 = if (isCash) "" else (invoice.shipToParty?.addressLine2 ?: "")
+        val consigneeCity = if (isCash) "" else (invoice.shipToParty?.city ?: "")
+        val consigneePin = if (isCash) "" else (invoice.shipToParty?.pincode ?: "")
 
         leftBlock.addCell(
             drawPartyCell(
                 title = "Consignee (Ship to)",
                 name = consigneeName,
-                gstin = invoice.shipToParty?.gstin ?: "",
-                stateName = invoice.shipToParty?.state ?: "",
-                stateCode = invoice.shipToParty?.stateCode ?: "",
+                gstin = consigneeGstin,
+                stateName = consigneeState,
+                stateCode = consigneeCode,
                 fixedHeight = 70f,
                 isBoldName = true,
-                addressLine1 = invoice.shipToParty?.addressLine1 ?: "",
-                addressLine2 = invoice.shipToParty?.addressLine2 ?: "",
-                city = invoice.shipToParty?.city ?: "",
-                pincode = invoice.shipToParty?.pincode ?: ""
+                addressLine1 = consigneeAddr1,
+                addressLine2 = consigneeAddr2,
+                city = consigneeCity,
+                pincode = consigneePin
             )
         )
 
@@ -246,6 +267,10 @@ object InvoicePdfGenerator {
         val buyerGstin = if (isCash) "" else (invoice.billToParty?.gstin ?: "")
         val buyerState = if (isCash) "" else (invoice.billToParty?.state ?: "")
         val buyerCode = if (isCash) "" else (invoice.billToParty?.stateCode ?: "")
+        val buyerAddr1 = if (isCash) "" else (invoice.billToParty?.addressLine1 ?: "")
+        val buyerAddr2 = if (isCash) "" else (invoice.billToParty?.addressLine2 ?: "")
+        val buyerCity = if (isCash) "" else (invoice.billToParty?.city ?: "")
+        val buyerPin = if (isCash) "" else (invoice.billToParty?.pincode ?: "")
 
         leftBlock.addCell(
             drawPartyCell(
@@ -256,10 +281,10 @@ object InvoicePdfGenerator {
                 stateCode = buyerCode,
                 fixedHeight = 70f,
                 isBoldName = true,
-                addressLine1 = invoice.billToParty?.addressLine1 ?: "",
-                addressLine2 = invoice.billToParty?.addressLine2 ?: "",
-                city = invoice.billToParty?.city ?: "",
-                pincode = invoice.billToParty?.pincode ?: ""
+                addressLine1 = buyerAddr1,
+                addressLine2 = buyerAddr2,
+                city = buyerCity,
+                pincode = buyerPin
             )
         )
 
@@ -411,10 +436,15 @@ object InvoicePdfGenerator {
     // SECTION 2: ITEM TABLE
     // ==========================================
     private fun drawItemTable(document: Document, invoice: Invoice) {
+        val hasTare = invoice.items.any { it.tareWeight != null }
 
         // 1. DEFINE COLUMNS
         // Page Width = 595 - 40 (margins) = 555 pts usable width
-        val colWidths = floatArrayOf(3f, 43f, 8f, 10f, 8f, 4f, 12f)
+        val colWidths = if (hasTare) {
+            floatArrayOf(3f, 31f, 8f, 7f, 7f, 8f, 8f, 4f, 12f)
+        } else {
+            floatArrayOf(3f, 43f, 8f, 10f, 8f, 4f, 12f)
+        }
         val table = Table(UnitValue.createPercentArray(colWidths))
         table.useAllAvailableWidth()
 
@@ -435,7 +465,13 @@ object InvoicePdfGenerator {
         addHeader("SI")
         addHeader("Description of Goods", TextAlignment.LEFT)
         addHeader("HSN/SAC")
-        addHeader("Quantity")
+        if (hasTare) {
+            addHeader("Gross Wt")
+            addHeader("Tare Wt\n(Bardana)")
+            addHeader("Net Wt")
+        } else {
+            addHeader("Quantity")
+        }
         addHeader("Rate")
         addHeader("per")
         addHeader("Amount")
@@ -450,6 +486,8 @@ object InvoicePdfGenerator {
         val isInterState = invoice.firm.stateCode != supplyStateCode
 
         var totalQty = 0.0
+        var totalGross = 0.0
+        var totalTare = 0.0
         var totalVal = 0.0
         var usedHeight = 20f
         var serialNumber = 1
@@ -475,6 +513,11 @@ object InvoicePdfGenerator {
             for (invItem in items) {
                 val item = invItem.item
                 totalQty += invItem.quantity
+                if (hasTare) {
+                    val tare = invItem.tareWeight ?: 0.0
+                    totalTare += tare
+                    totalGross += (invItem.quantity + tare)
+                }
                 totalVal += invItem.taxableValue
 
                 val descLines = (item.name.length / 35) + 1
@@ -489,9 +532,22 @@ object InvoicePdfGenerator {
                 // HSN (Max Width 42pts)
                 addCell(createAutoFitParagraph(item.hsnCode, 42f), TextAlignment.LEFT)
 
-                // Quantity (Max Width 53pts)
-                val qtyText = "${"%.2f".format(invItem.quantity)} ${item.unit}"
-                addCell(createAutoFitParagraph(qtyText, 53f, isBold = true), TextAlignment.RIGHT)
+                // Quantity / Weights
+                if (hasTare) {
+                    val tare = invItem.tareWeight ?: 0.0
+                    val gross = invItem.quantity + tare
+
+                    val grossText = if (gross > 0) "${"%.2f".format(gross)} ${item.unit}" else ""
+                    val tareText = if (invItem.tareWeight != null) "${"%.2f".format(tare)} ${item.unit}" else "-"
+                    val netText = "${"%.2f".format(invItem.quantity)} ${item.unit}"
+
+                    addCell(createAutoFitParagraph(grossText, 35f, isBold = true), TextAlignment.RIGHT)
+                    addCell(createAutoFitParagraph(tareText, 35f, isBold = false), TextAlignment.RIGHT)
+                    addCell(createAutoFitParagraph(netText, 40f, isBold = true), TextAlignment.RIGHT)
+                } else {
+                    val qtyText = "${"%.2f".format(invItem.quantity)} ${item.unit}"
+                    addCell(createAutoFitParagraph(qtyText, 53f, isBold = true), TextAlignment.RIGHT)
+                }
 
                 // Rate
                 addCell(Paragraph("%.2f".format(invItem.rate)).setFontSize(dataSize), TextAlignment.RIGHT)
@@ -522,7 +578,13 @@ object InvoicePdfGenerator {
                     addCell(labelPara, TextAlignment.RIGHT) // Desc
 
                     addCell(Paragraph(""), TextAlignment.CENTER) // HSN
-                    addCell(Paragraph(""), TextAlignment.CENTER) // Qty
+                    if (hasTare) {
+                        addCell(Paragraph(""), TextAlignment.CENTER) // Gross Wt
+                        addCell(Paragraph(""), TextAlignment.CENTER) // Tare
+                        addCell(Paragraph(""), TextAlignment.CENTER) // Net Wt
+                    } else {
+                        addCell(Paragraph(""), TextAlignment.CENTER) // Qty
+                    }
                     addCell(Paragraph(""), TextAlignment.CENTER) // Rate
                     addCell(Paragraph(""), TextAlignment.CENTER) // Per
 
@@ -549,7 +611,8 @@ object InvoicePdfGenerator {
         val fillerHeight = if (remainingHeight > 0) remainingHeight else 0f
 
         if (fillerHeight > 0) {
-            for (i in 0 until 7) {
+            val colCount = if (hasTare) 9 else 7
+            for (i in 0 until colCount) {
                 val filler = Cell()
                     .setHeight(fillerHeight)
                     .setBorderTop(Border.NO_BORDER)
@@ -574,9 +637,19 @@ object InvoicePdfGenerator {
 
         addTotalCell(Paragraph("Total").setFontSize(dataSize).setBold(), TextAlignment.RIGHT, colSpan = 3)
 
-        // Total Qty
-        val totalQtyStr = "%.2f KGS".format(totalQty)
-        addTotalCell(createAutoFitParagraph(totalQtyStr, 53f, isBold = true), TextAlignment.RIGHT)
+        // Total Qty / Weights
+        if (hasTare) {
+            val totalGrossStr = "%.2f KGS".format(totalGross)
+            val totalTareStr = "%.2f KGS".format(totalTare)
+            val totalNetStr = "%.2f KGS".format(totalQty)
+
+            addTotalCell(createAutoFitParagraph(totalGrossStr, 35f, isBold = true), TextAlignment.RIGHT)
+            addTotalCell(createAutoFitParagraph(totalTareStr, 35f, isBold = true), TextAlignment.RIGHT)
+            addTotalCell(createAutoFitParagraph(totalNetStr, 40f, isBold = true), TextAlignment.RIGHT)
+        } else {
+            val totalQtyStr = "%.2f KGS".format(totalQty)
+            addTotalCell(createAutoFitParagraph(totalQtyStr, 53f, isBold = true), TextAlignment.RIGHT)
+        }
 
         addTotalCell(Paragraph(""), TextAlignment.CENTER) // Rate
         addTotalCell(Paragraph(""), TextAlignment.CENTER) // Per
@@ -1070,4 +1143,240 @@ object InvoicePdfGenerator {
 
 
 
+
+    // ==========================================
+    // E-WAY BILL PAGE GENERATOR
+    // ==========================================
+    fun drawEWayBillPage(document: Document, invoice: Invoice) {
+        // Start a new page
+        document.add(com.itextpdf.layout.element.AreaBreak(AreaBreakType.NEXT_PAGE))
+        
+        // 1. Title "e-Way Bill"
+        document.add(Paragraph("e-Way Bill")
+            .setTextAlignment(TextAlignment.CENTER)
+            .setBold()
+            .setFontSize(10f)
+            .setMarginBottom(2f)
+        )
+
+        // 2. QR Code (Center)
+        // Format: EWB No. : <ewb> / GSTIN : <gstin> / Date : <date>
+        val ewb = invoice.eWayBillDetails
+        val qrText = "EWB No. : ${ewb?.ewayBillNo ?: ""} / GSTIN : ${invoice.firm.gstin} / Date : ${ewb?.ewayBillDate ?: ""}"
+        
+        try {
+            val qrCode = BarcodeQRCode(qrText)
+            val qrImage = Image(qrCode.createFormXObject(document.pdfDocument))
+            qrImage.setWidth(100f).setHeight(100f)
+            qrImage.setHorizontalAlignment(HorizontalAlignment.CENTER)
+            document.add(qrImage)
+        } catch(e: Exception) {
+            document.add(Paragraph("[QR Code]").setTextAlignment(TextAlignment.CENTER))
+        }
+
+        document.add(Paragraph("").setMarginBottom(10f)) // Spacer
+
+
+        // Helper for Key-Value Rows (No Border)
+        fun addRow(table: Table, label: String, value: String) {
+            table.addCell(Cell().add(Paragraph(label).setFontSize(9f)).setBorder(Border.NO_BORDER))
+            table.addCell(Cell().add(Paragraph(": $value").setFontSize(9f).setBold()).setBorder(Border.NO_BORDER))
+        }
+
+        // 3. E-Way Bill Details Header (Labels 30%, Value 70%)
+        val headerTable = Table(UnitValue.createPercentArray(floatArrayOf(30f, 70f))).useAllAvailableWidth()
+        
+        // Helper to format Valid From date: "dd/MM/yyyy HH:mm" -> "dd-MMM-yy hh:mm a [XX KM]"
+        fun formatValidFrom(dateStr: String, dist: Int, showDistance: Boolean = true): String {
+            if (dateStr.isBlank()) return ""
+            return try {
+                // Try Parsing common formats
+                val inputFormats = listOf(
+                    java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.US),
+                    java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.US),
+                    java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss", java.util.Locale.US),
+                    java.text.SimpleDateFormat("dd-MM-yyyy HH:mm", java.util.Locale.US),
+                    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US),
+                    // User reported format: 17-Dec-2025 15:00:00
+                    java.text.SimpleDateFormat("dd-MMM-yyyy HH:mm:ss", java.util.Locale.US),
+                    java.text.SimpleDateFormat("dd-MMM-yyyy HH:mm", java.util.Locale.US)
+                )
+                
+                var date: java.util.Date? = null
+                for (fmt in inputFormats) {
+                    try { date = fmt.parse(dateStr); break } catch (e: Exception) {}
+                }
+
+                val postfix = if (showDistance) " [${dist} KM]" else ""
+
+                if (date != null) {
+                    val outFmt = java.text.SimpleDateFormat("dd-MMM-yy hh:mm a", java.util.Locale.US)
+                    "${outFmt.format(date)}$postfix"
+                } else {
+                    "$dateStr$postfix"
+                }
+            } catch (e: Exception) {
+                val postfix = if (showDistance) " [${dist} KM]" else ""
+                "$dateStr$postfix"
+            }
+        }
+
+        addRow(headerTable, "E-Way Bill No", ewb?.ewayBillNo ?: "")
+        addRow(headerTable, "E-Way Bill Date", ewb?.ewayBillDate ?: "")
+        addRow(headerTable, "Generated By", ewb?.generatedBy ?: "")
+        
+        // Use EWB Distance if scraped (and > 0), else fallback to Invoice Local Distance
+        val finalDistance = if ((ewb?.distanceKm ?: 0) > 0) ewb!!.distanceKm else invoice.transportDetails.distance
+
+        val validFromStr = formatValidFrom(ewb?.validFrom ?: "", finalDistance, true)
+        addRow(headerTable, "Valid From", validFromStr)
+        
+        val validUntil = if (!ewb?.validUpto.isNullOrBlank()) "${ewb?.validUpto} 11:59 PM" else ""
+        addRow(headerTable, "Valid Until", validUntil)
+        
+        document.add(headerTable)
+        drawSeparator(document)
+
+
+        // 4. IRN Details (Only if E-Invoice exists)
+        if (invoice.eInvoiceDetails != null && invoice.eInvoiceDetails.irn.isNotBlank()) {
+             document.add(Paragraph("IRN Details").setBold().setFontSize(9f).setMarginTop(5f))
+             val irnTable = Table(UnitValue.createPercentArray(floatArrayOf(30f, 70f))).useAllAvailableWidth()
+             addRow(irnTable, "IRN", invoice.eInvoiceDetails.irn)
+             addRow(irnTable, "Ack No.", invoice.eInvoiceDetails.ackNo)
+             addRow(irnTable, "Ack Date", invoice.eInvoiceDetails.ackDate)
+             document.add(irnTable)
+             drawSeparator(document)
+        }
+
+
+        // 5. Part - A
+        document.add(Paragraph("Part - A").setBold().setFontSize(9f).setUnderline())
+        val partATable = Table(UnitValue.createPercentArray(floatArrayOf(30f, 70f))).useAllAvailableWidth()
+
+        // Supplier (Clean Address with Pincode)
+        // Format: Line1, City-Pin State
+        // Ensure Pincode is strictly 6 digits attached to City or separate
+        val sellerAddr = buildString {
+             append(invoice.firm.addressLine1)
+             if (invoice.firm.addressLine2?.isNotBlank()==true) append(", ${invoice.firm.addressLine2}")
+             append(", ${invoice.firm.city}")
+             append(" ${invoice.firm.state}")
+            if (invoice.firm.pincode.isNotBlank()) append(" ${invoice.firm.pincode}")
+        }
+        
+        addRow(partATable, "GSTIN of Supplier", invoice.firm.gstin)
+        addRow(partATable, "Place of Dispatch", sellerAddr)
+
+        // Recipient
+        val buyer = invoice.shipToParty ?: invoice.billToParty
+        val buyerAddr = buildString {
+             append(buyer?.addressLine1 ?: "")
+             if (!buyer?.addressLine2.isNullOrBlank()) append(", ${buyer?.addressLine2}")
+             append(", ${buyer?.city ?: ""}")
+             append(" ${buyer?.state ?: ""}")
+            if (!buyer?.pincode.isNullOrBlank()) append(" ${buyer?.pincode}")
+        }
+        
+        addRow(partATable, "GSTIN of Recipient", "${buyer?.gstin}")
+        addRow(partATable, "Place of Delivery", buyerAddr)
+
+        // Doc Details
+        addRow(partATable, "Document No.", invoice.invoiceNumber)
+        addRow(partATable, "Document Date", invoice.invoiceDate)
+        val isBillToShipToSame = (invoice.billToParty?.partyId == invoice.shipToParty?.partyId) || (invoice.shipToParty == null)
+        val transTypeStr = if (isBillToShipToSame) "Regular" else "Bill To - Ship To"
+        addRow(partATable, "Transaction Type", transTypeStr)
+        addRow(partATable, "Value of Goods", "%.2f".format(invoice.totalInvoiceValue))
+        
+        // HSN Code (Highest Value item HSN + count of others style: "390319 - (+1 )")
+        val hsn = if(invoice.items.isNotEmpty()) {
+             // Pick main item by taxable value
+             val mainItem = invoice.items.maxByOrNull { it.taxableValue } ?: invoice.items[0]
+             val mainHsn = mainItem.item.hsnCode
+             
+             val extraCount = invoice.items.size - 1
+             if (extraCount > 0) "$mainHsn - ( +$extraCount )" else mainHsn
+        } else ""
+        addRow(partATable, "HSN Code", hsn)
+        
+        addRow(partATable, "Supply Type", "Outward - Supply")
+        
+        // Transporter
+        val transporter = "${invoice.transportDetails.transporterId ?: ""} - ${invoice.transportDetails.transporterName ?: ""}"
+        addRow(partATable, "Transporter", transporter)
+        
+        document.add(partATable)
+        document.add(Paragraph("").setMarginBottom(10f)) // Spacer
+
+
+        // 6. Part - B (Table)
+        // Style: Header Top/Bottom Border, No Grid, Data Bottom Border
+        document.add(Paragraph("Part - B").setBold().setFontSize(9f).setMarginBottom(2f))
+
+        // Columns: Mode, Vehicle/Trans Doc, From, Entered Date, Entered By, CEWB
+        val partBTable = Table(UnitValue.createPercentArray(floatArrayOf(10f, 25f, 20f, 15f, 20f, 10f))).useAllAvailableWidth()
+        
+        // Headers (Top and Bottom Border, No Side Borders, No Background)
+        fun addHeader(text: String) {
+            partBTable.addCell(Cell().add(Paragraph(text).setBold().setFontSize(8f))
+                .setBorder(Border.NO_BORDER)
+                .setBorderTop(SolidBorder(0.5f))
+                .setBorderBottom(SolidBorder(0.5f))
+                .setPaddingTop(2f).setPaddingBottom(2f)
+            )
+        }
+        addHeader("Mode")
+        addHeader("Vehicle / Trans\nDoc No & Dt.")
+        addHeader("From")
+        addHeader("Entered\nDate")
+        addHeader("Entered By")
+        addHeader("CEWB No.\n(if any)")
+
+        // Data Row (Bottom Border, No Side Borders)
+        fun addData(text: String) {
+             partBTable.addCell(Cell().add(Paragraph(text).setFontSize(8f))
+                 .setBorder(Border.NO_BORDER)
+                 .setBorderBottom(SolidBorder(0.5f))
+                 .setPaddingTop(2f).setPaddingBottom(2f)
+             )
+        }
+        
+        // Mode Mapping
+        val mode = when(invoice.transportDetails.mode) {
+            TransportMode.ROAD  -> "1 - Road"
+            TransportMode.RAIL ->  "2 - Rail"
+            TransportMode.AIR ->  "3 - Air"
+            TransportMode.SHIP ->  "4 - Ship"
+            else -> "1 - Road"
+        }
+        
+        // Doc Details: Merge Vehicle AND Doc No/Date
+        // Format: "UP17... / \n 01187 & 17-Dec-25"
+        val docDetails = buildString {
+             if (!invoice.transportDetails.vehicleNumber.isNullOrBlank()) {
+                 append("${invoice.transportDetails.vehicleNumber} / ")
+             }
+             if (!invoice.transportDetails.transporterDocNo.isNullOrBlank()) {
+                 if(this.isNotEmpty()) append("\n")
+                 append(invoice.transportDetails.transporterDocNo)
+                 if (!invoice.transportDetails.transporterDocDate.isNullOrBlank()) {
+                      append(" & ${invoice.transportDetails.transporterDocDate}")
+                 }
+             }
+        }
+
+        addData(mode)
+        addData(docDetails)
+        addData(invoice.firm.city) // From (Dispatch City)
+        addData(ewb?.ewayBillDate ?: "") // Entered Date (Approx)
+        addData(invoice.firm.gstin) // Entered By (Self)
+        addData("") // CEWB
+
+        document.add(partBTable)
+    }
+
+    private fun drawSeparator(document: Document) {
+        document.add(com.itextpdf.layout.element.LineSeparator(com.itextpdf.kernel.pdf.canvas.draw.SolidLine(0.5f)).setMarginTop(5f).setMarginBottom(5f))
+    }
 }

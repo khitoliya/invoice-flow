@@ -103,14 +103,27 @@ object InvoiceValidator {
         }
 
         invoice.items.forEach {
-            errors += ItemValidator.validate(it.item, level)
+            errors += InvoiceItemValidator.validate(it, level)
         }
 
         // Transport
         errors += TransportValidator.validate(
             invoice.transportDetails,
-            level
+            level,
+
         )
+
+        if ( (invoice.generateEInvoice || invoice.generateEWayBill) &&
+            invoice.transportDetails.deliveryType == com.dollyplastic.invoiceapp.data.models.DeliveryType.BUYER_PICKUP
+        ) {
+            errors.add(
+                ValidationError(
+                    field = "deliveryType",
+                    message = "Buyer Pickup is not allowed for E-Invoice/E-Way Bill",
+                    section = "Transport"
+                )
+            )
+        }
         Log.d("InvoiceValidator", "Validation errors: $errors")
 
         return if (errors.isEmpty())

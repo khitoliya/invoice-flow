@@ -15,6 +15,10 @@ data class PartyFormState(
     val state: String = "",
     val stateCode: String = "",
     val pincode: String = "",
+    val distances: Map<String, String> = emptyMap(), // Legacy, removing
+    val unknownPincodes: List<com.dollyplastic.invoiceapp.ui.models.PincodeInputGroup> = emptyList(),
+    val isLoadingDistances: Boolean = false,
+    val touchedFields: Set<String> = emptySet(),
     val errors: Map<String, String> = emptyMap()
 ) {
 
@@ -43,6 +47,13 @@ data class PartyFormState(
             "pincode" -> copy(pincode = value)
             else -> this
         }
+
+    fun updateDistance(pincode: String, value: String): PartyFormState {
+        val newList = unknownPincodes.map { 
+            if (it.pincode == pincode) it.copy(distance = value) else it 
+        }
+        return copy(unknownPincodes = newList)
+    }
 
     companion object {
         fun fromParty(party: Party) = PartyFormState(

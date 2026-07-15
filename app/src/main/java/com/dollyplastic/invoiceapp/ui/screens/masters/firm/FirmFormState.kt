@@ -19,7 +19,10 @@ data class FirmFormState(
     val accountNumber: String = "",
     val ifscCode: String = "",
     val branchName: String = "",
-
+    val unknownPincodes: List<com.dollyplastic.invoiceapp.ui.models.PincodeInputGroup> = emptyList(),
+    val isLoadingDistances: Boolean = false,
+    val touchedFields: Set<String> = emptySet(),
+    
     val errors: Map<String, String> = emptyMap()
 ) {
 
@@ -57,6 +60,13 @@ data class FirmFormState(
             "branchName" -> copy(branchName = value)
             else -> this
         }
+
+    fun updateDistance(pincode: String, value: String): FirmFormState {
+        val newList = unknownPincodes.map { 
+            if (it.pincode == pincode) it.copy(distance = value) else it 
+        }
+        return copy(unknownPincodes = newList)
+    }
 
     companion object {
         fun fromFirm(firm: Firm): FirmFormState =

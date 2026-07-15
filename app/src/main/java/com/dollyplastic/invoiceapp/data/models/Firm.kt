@@ -1,6 +1,11 @@
 package com.dollyplastic.invoiceapp.data.models
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "firms")
 data class Firm(
+    @PrimaryKey
     val firmId: String="",            // internal unique ID
     val tradeName: String="",         // PRIMARY name (invoice display)
     val nickName: String="",          // short / internal identifier

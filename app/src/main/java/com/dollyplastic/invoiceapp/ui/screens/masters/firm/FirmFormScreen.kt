@@ -1,22 +1,32 @@
 package com.dollyplastic.invoiceapp.ui.screens.masters.firm
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,11 +34,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonColors
+
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.dollyplastic.invoiceapp.ui.components.ConfirmDetailsDialog
+import com.dollyplastic.invoiceapp.ui.common.dialogs.ConfirmDetailDialog
+import com.dollyplastic.invoiceapp.ui.common.dialogs.DetailSection
+import com.dollyplastic.invoiceapp.ui.common.dialogs.DetailItem
+import com.dollyplastic.invoiceapp.ui.common.TextFields.AuthLabel
+import com.dollyplastic.invoiceapp.ui.common.TextFields.AuthTextField
+import com.dollyplastic.invoiceapp.ui.common.dialogs.ValidationErrorDialog
+import com.dollyplastic.invoiceapp.ui.theme.AppColors
+import com.dollyplastic.invoiceapp.ui.theme.AppRadius
+import com.dollyplastic.invoiceapp.ui.theme.AppText
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,252 +84,290 @@ fun FirmFormScreen(
         }
     }
 
-
-
     LaunchedEffect(firmId) {
         firmId?.let { viewModel.loadFirmForEdit(it) }
     }
 
-    showErrorDialog?.let { message ->
-        AlertDialog(
-            onDismissRequest = { showErrorDialog = null },
-            title = { Text("Error") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { showErrorDialog = null }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
 
 
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(if (firmId == null) "Add Firm" else "Edit Firm")
-                }
-            )
-        }
-    ) { padding ->
-
-        Column(
-            modifier = Modifier
-                .padding(padding)
+    Column(
+        modifier = Modifier
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Spacer(modifier=Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.ArrowBackIosNew,
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(18.dp)
+                        .clickable {
+                            navController.popBackStack()
+                        }
+                )
+                Text(
+                    if (firmId == null) "Add New Firm" else "Edit Firm",
+                    style = AppText.H2.copy(fontSize =20.sp)
+                )
+                Icon(
+                    Icons.Default.ArrowBackIosNew,
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(24.dp),
+                    tint=Color.Transparent
+
+                )
+            }
+
+            Spacer(modifier=Modifier.height(45.dp))
+
+            // Profile Icon
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(bottom = 24.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = AppColors.PrimaryBlue,
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Business,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+
+        Spacer(modifier=Modifier.height(16.dp))
 
             // Trade Name
-            OutlinedTextField(
+            FirmFormField(
+                label = "Firm Name *",
                 value = state.tradeName,
-                onValueChange = {
-                    viewModel.onFieldChange("tradeName", it)
-                },
-                label = { Text("Trade Name*") },
-                isError = state.errors.containsKey("tradeName"),
-                supportingText = {
-                    state.errors["tradeName"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onValueChange = { viewModel.onFieldChange("tradeName", it) },
+                onBlur = { viewModel.onFieldBlur("tradeName") },
+                placeholder = "Full Trade Name",
+                icon = Icons.Default.Business,
+                error = state.errors["tradeName"]
             )
 
             // GSTIN
-            OutlinedTextField(
+            FirmFormField(
+                label = "GSTIN *",
                 value = state.gstin,
-                onValueChange = {
-                    viewModel.onGstinChange(it)
-                },
-                label = { Text("GSTIN*") },
-                isError = state.errors.containsKey("gstin"),
-                supportingText = {
-                    state.errors["gstin"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onValueChange = { viewModel.onGstinChange(it) },
+                onBlur = { viewModel.onFieldBlur("gstin") },
+                placeholder = "GST Identification Number",
+                icon = Icons.Default.Receipt,
+                error = state.errors["gstin"]
             )
-            // Nick Name (optional but recommended)
-            OutlinedTextField(
+
+            // Nick Name
+            FirmFormField(
+                label = "Nick Name (Optional)",
                 value = state.nickName,
-                onValueChange = {
-                    viewModel.onFieldChange("nickName", it)
-                },
-                label = { Text("Nick Name") },
-                supportingText = {
-                    Text(
-                        "Short internal name (optional)",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                onValueChange = { viewModel.onFieldChange("nickName", it) },
+                onBlur = { viewModel.onFieldBlur("nickName") },
+                placeholder = "Short internal name",
+                icon = Icons.Default.Face
             )
+
 
 
             // Address Line 1
-            OutlinedTextField(
+            FirmFormField(
+                label = "Address Line 1 *",
                 value = state.addressLine1,
-                onValueChange = {
-                    viewModel.onFieldChange("addressLine1", it)
-                },
-                label = { Text("Address Line 1*") },
-                isError = state.errors.containsKey("addressLine1"),
-                supportingText = {
-                    state.errors["addressLine1"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onValueChange = { viewModel.onFieldChange("addressLine1", it) },
+                onBlur = { viewModel.onFieldBlur("addressLine1") },
+                placeholder = "Street address",
+                icon = Icons.Default.Home,
+                error = state.errors["addressLine1"]
             )
 
-            // Address Line 2 (optional)
-            OutlinedTextField(
-                value = state.addressLine2,
-                onValueChange = {
-                    viewModel.onFieldChange("addressLine2", it)
-                },
-                label = { Text("Address Line 2") }
+            // Address Line 2
+            FirmFormField(
+                label = "Address Line 2",
+                value = state.addressLine2 ?: "",
+                onValueChange = { viewModel.onFieldChange("addressLine2", it) },
+                onBlur = { viewModel.onFieldBlur("addressLine2") },
+                placeholder = "Apartment, suite, etc.",
+                icon = Icons.Default.Business
             )
 
             // City
-            OutlinedTextField(
+            FirmFormField(
+                label = "City *",
                 value = state.city,
-                onValueChange = {
-                    viewModel.onFieldChange("city", it)
-                },
-                label = { Text("City*") },
-                isError = state.errors.containsKey("city"),
-                supportingText = {
-                    state.errors["city"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onValueChange = { viewModel.onFieldChange("city", it) },
+                onBlur = { viewModel.onFieldBlur("city") },
+                placeholder = "City",
+                icon = Icons.Default.LocationCity,
+                error = state.errors["city"]
             )
 
             // State
-            OutlinedTextField(
+            FirmFormField(
+                label = "State *",
                 value = state.state,
-                onValueChange = {
-
-                },
-                label = { Text("State*") },
-                isError = state.errors.containsKey("state"),
-                supportingText = {
-                    state.errors["state"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onValueChange = { },
+                onBlur = { viewModel.onFieldBlur("state") },
+                placeholder = "State",
+                icon = Icons.Default.Map,
+                error = state.errors["state"]
             )
 
             // State Code
-            OutlinedTextField(
+            FirmFormField(
+                label = "State Code",
                 value = state.stateCode,
                 onValueChange = {},
-                label = { Text("State Code") },
-                readOnly = true
+                placeholder = "Code",
+                icon = Icons.Default.Numbers
             )
-
 
             // Pincode
-            OutlinedTextField(
+            FirmFormField(
+                label = "Pincode *",
                 value = state.pincode,
-                onValueChange = {
-                    viewModel.onFieldChange("pincode", it)
-                },
-                label = { Text("Pincode*") },
-                isError = state.errors.containsKey("pincode"),
-                supportingText = {
-                    state.errors["pincode"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
+                onValueChange = { viewModel.onFieldChange("pincode", it) },
+                onBlur = { viewModel.onFieldBlur("pincode") },
+                placeholder = "ZIP/Postal Code",
+                icon = Icons.Default.PinDrop,
+                error = state.errors["pincode"],
+                trailingContent = {
+                    if (state.isLoadingDistances) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
                     }
                 }
             )
 
-            Text(
-                text = "Bank Details",
-                style = MaterialTheme.typography.titleMedium
-            )
 
-            OutlinedTextField(
+
+
+
+            FirmFormField(
+                label = "Bank Name *",
                 value = state.bankName,
                 onValueChange = { viewModel.onFieldChange("bankName", it) },
-                label = { Text("Bank Name*") },
-                isError = state.errors.containsKey("bankName"),
-                supportingText = {
-                    state.errors["bankName"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onBlur = { viewModel.onFieldBlur("bankName") },
+                placeholder = "Bank Name",
+                icon = Icons.Default.AccountBalance,
+                error = state.errors["bankName"]
             )
-            OutlinedTextField(
+            FirmFormField(
+                label = "Account Number *",
                 value = state.accountNumber,
                 onValueChange = { viewModel.onFieldChange("accountNumber", it) },
-                label = { Text("Account Number*") },
-                isError = state.errors.containsKey("accountNumber"),
-                supportingText = {
-                    state.errors["accountNumber"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onBlur = { viewModel.onFieldBlur("accountNumber") },
+                placeholder = "Account No.",
+                icon = Icons.Default.Numbers,
+                error = state.errors["accountNumber"]
             )
-            OutlinedTextField(
+            FirmFormField(
+                label = "IFSC Code *",
                 value = state.ifscCode,
                 onValueChange = { viewModel.onFieldChange("ifscCode", it) },
-                label = { Text("IFSC Code*") },
-                isError = state.errors.containsKey("ifscCode"),
-                supportingText = {
-                    state.errors["ifscCode"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onBlur = { viewModel.onFieldBlur("ifscCode") },
+                placeholder = "IFSC",
+                icon = Icons.Default.QrCode,
+                error = state.errors["ifscCode"]
             )
-            OutlinedTextField(
+            FirmFormField(
+                label = "Branch Name *",
                 value = state.branchName,
                 onValueChange = { viewModel.onFieldChange("branchName", it) },
-                label = { Text("Branch Name*") },
-                isError = state.errors.containsKey("branchName"),
-                supportingText = {
-                    state.errors["branchName"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                onBlur = { viewModel.onFieldBlur("branchName") },
+                placeholder = "Branch",
+                icon = Icons.Default.LocationOn,
+                error = state.errors["branchName"]
             )
 
 
+            
+                state.unknownPincodes.forEach { group ->
+                    FirmFormField(
+                        label = "Distance to ${group.pincode} (Km)",
+                        value = group.distance,
+                        onValueChange = { viewModel.onDistanceChange(group.pincode, it) },
+                        placeholder = "Distance in Km",
+                        icon = Icons.Default.DirectionsCar
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            val isDistanceValid = !state.isLoadingDistances && state.unknownPincodes.all { 
+                it.distance.isNotBlank() && (it.distance.toIntOrNull() ?: 0) > 0 
+            }
+            
+            val isModified by viewModel.isModified.collectAsState()
 
             Button(
-                onClick = {
-                    viewModel.requestSaveConfirmation()
-                },
-                enabled = isFormValid,
-                modifier = Modifier.fillMaxWidth()
+                onClick = { viewModel.requestSaveConfirmation() },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                enabled = isFormValid && isDistanceValid && !state.isLoadingDistances && isModified,
+                colors = ButtonColors(
+                    containerColor = AppColors.PrimaryBlue,
+                    contentColor = Color.White,
+                    disabledContainerColor = AppColors.PrimaryBlue.copy(alpha = 0.5f),
+                    disabledContentColor = Color.White.copy(alpha = 0.7f)
+                )
             ) {
-                Text("Save")
+                Text(if (firmId == null) "Add Firm" else "Update Firm")
             }
-        }
+            Spacer(modifier = Modifier.height(24.dp))
+
     }
-    val confirmDetails = listOf(
-        "Trade Name" to state.tradeName,
-        "Nick Name" to state.nickName,
-        "GSTIN" to state.gstin,
-        "State" to state.state,
-        "State Code" to state.stateCode,
-        "Address Line 1" to state.addressLine1,
-        "City" to state.city,
-        "Pincode" to state.pincode,
-        "Bank Name" to state.bankName,
-        "Account No" to state.accountNumber,
-        "IFSC" to state.ifscCode,
-        "Branch" to state.branchName
+    
+    val confirmSections = listOf(
+        DetailSection(
+            title = "General Info",
+            items = listOf(
+                DetailItem("Trade Name", state.tradeName),
+                DetailItem("Nick Name", state.nickName.ifBlank { "-" }),
+                DetailItem("GSTIN", state.gstin)
+            )
+        ),
+        DetailSection(
+            title = "Address",
+            items = listOf(
+                DetailItem("Address", "${state.addressLine1}${if (state.addressLine2.isNotBlank()) "\n${state.addressLine2}" else ""}"),
+                DetailItem("City/State", "${state.city}, ${state.state} - ${state.pincode}")
+            )
+        ),
+        DetailSection(
+            title = "Bank Details",
+            items = listOf(
+                DetailItem("Bank Name", state.bankName),
+                DetailItem("Account No", state.accountNumber),
+                DetailItem("IFSC", state.ifscCode),
+                DetailItem("Branch", state.branchName)
+            )
+        )
     )
 
     if (showConfirmDialog) {
-        ConfirmDetailsDialog(
+        com.dollyplastic.invoiceapp.ui.common.dialogs.ConfirmDetailDialog(
             title = "Confirm Firm Details",
-            details = confirmDetails,
+            description = "Please review the details below before saving.",
+            sections = confirmSections,
+            icon = Icons.Default.Business,
             onConfirm = {
                 showConfirmDialog = false
                 viewModel.saveFirm {
@@ -311,7 +377,50 @@ fun FirmFormScreen(
             onDismiss = { showConfirmDialog = false }
         )
     }
-
-
+    
+    showErrorDialog?.let { message ->
+        ValidationErrorDialog(
+            errors = listOf(message),
+            onDismiss = { showErrorDialog = null }
+        )
+    }
 }
 
+@Composable
+fun FirmFormField(
+    label: String, 
+    value: String, 
+    onValueChange: (String) -> Unit, 
+    onBlur: (() -> Unit)? = null,
+    placeholder: String, 
+    icon: ImageVector, 
+    error: String? = null, 
+    trailingContent: @Composable (() -> Unit)? = null
+) {
+    var wasFocused by remember { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+        AuthLabel(label)
+        AuthTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = placeholder,
+            leadingIcon = icon,
+            trailingContent = trailingContent,
+            modifier = Modifier.onFocusChanged { focusState ->
+                if (wasFocused && !focusState.isFocused) {
+                    onBlur?.invoke()
+                }
+                wasFocused = focusState.isFocused
+            }
+        )
+        if (error != null) {
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+            )
+        }
+    }
+}

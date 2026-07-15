@@ -1,6 +1,11 @@
 package com.dollyplastic.invoiceapp.data.models
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "parties")
 data class Party(
+    @PrimaryKey
     val partyId: String="",           // internal unique ID
     val tradeName: String="",
     val nickName: String="",          // handles same buyer, diff address

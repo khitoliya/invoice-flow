@@ -38,7 +38,7 @@ data class TransportDetails(
 
     val transporterDocNo: String? = null,     // LR / RR / AWB / BL
     val transporterDocDate: String? = null,   // dd-MM-yyyy
-    val distance: Int = 0 // Required for E-Way Bill
+    val distance: Int = 0, // Required for E-Way Bill
 
     /* ---------- OPTIONAL ---------- */
 

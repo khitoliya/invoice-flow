@@ -2,7 +2,8 @@ package com.dollyplastic.invoiceapp.pdf
 
 
 import com.dollyplastic.invoiceapp.data.models.*
-import com.dollyplastic.invoiceapp.domain.EwayBill.EWayBillDetails
+import com.dollyplastic.invoiceapp.domain.Compliance.EInvoice.EInvoiceDetails
+import com.dollyplastic.invoiceapp.domain.Compliance.EwayBill.EWayBillDetails
 
 object InvoiceTestFactory {
 
@@ -32,6 +33,7 @@ object InvoiceTestFactory {
             shipToParty = Party(
                 tradeName = "DOLLY PLASTIC WAREHOUSE",
                 addressLine1 = "Plot No 55, Udyog Vihar Phase IV",
+                addressLine2 = "Sector 18",
                 city = "Gurugram",
                 state = "Haryana",
                 pincode = "122015",
@@ -45,9 +47,9 @@ object InvoiceTestFactory {
             totalTaxAmount = igstAmount,
             totalInvoiceValue = taxableValue + igstAmount,
 
-            eWayBillDetails = EWayBillDetails(ewayBillNo = "441660438080"),
             transportDetails = TransportDetails(
                 transporterName = "TRANS GLOBAL CARRIER SERVICE",
+                transporterId = "07AAEFT1234J1Z5",
                 transporterDocNo = "GR-8821",
                 transporterDocDate = "17-Dec-2025",
                 vehicleNumber = "UP17-AT-3377",
@@ -68,7 +70,17 @@ object InvoiceTestFactory {
                 ackNo = "123456789012345",
                 ackDate = "17-Dec-2025 14:35:22",
                 signedQrCode = "ThisIsATestStringForQRCodeGenerationInThePDF"
-            )
+            ),
+            generateEWayBill = true,
+            eWayBillDetails = EWayBillDetails(
+                ewayBillNo = "441660438080",
+                ewayBillDate = "17-Dec-2025",
+                generatedBy = getFirm().gstin,
+                validFrom = "17-Dec-2025 15:00:00",
+                validUpto = "24-Dec-2025",
+                distanceKm = 88
+            ),
+
         )
     }
 
@@ -173,7 +185,7 @@ object InvoiceTestFactory {
                     unit = "KGS",
                     gstRate = 18.0
                 ),
-                quantity = 60000.00,
+                quantity = 6000.00,
                 rate = 36.00,
                 taxableValue = 216000.00,
                 gstAmount = 38880.00
@@ -187,8 +199,8 @@ object InvoiceTestFactory {
                 ),
                 quantity = 4000.00,
                 rate = 58.00,
-                taxableValue = 99999.00,
-                gstAmount = 2345.00
+                taxableValue = 232000.00,
+                gstAmount = 41760.00
             )
 
         )

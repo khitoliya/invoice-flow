@@ -20,16 +20,67 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import kotlinx.coroutines.flow.combine
+import com.dollyplastic.invoiceapp.data.models.Firm
+import com.dollyplastic.invoiceapp.data.repository.FirmRepository
+import kotlin.random.Random
+
+
+
 @HiltViewModel
 class ItemViewModel @Inject constructor(
     private val repository: ItemRepository,
+    private val firmRepository: FirmRepository,
     private val addItemUseCase: AddItemUseCase
 ) : ViewModel() {
 
     /* ---------- LIST ---------- */
 
     private val _items = MutableStateFlow<List<Item>>(emptyList())
-    val items = _items.asStateFlow()
+    private val _firms = MutableStateFlow<List<Firm>>(emptyList())
+    
+    // Wire up: Placeholder for future backend stock data
+    // Map<ItemId, Map<FirmId, StockQty>>
+    private val _stockData = MutableStateFlow<Map<String, Map<String, Int>>>(emptyMap())
+
+    private val _expandedItems = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedFirm = MutableStateFlow<Firm?>(null)
+
+    val selectedFirm = _selectedFirm.asStateFlow()
+    val availableFirms = _firms.asStateFlow()
+
+    // Combined UI State
+    val itemUiModels = combine(
+        _items,
+        _firms,
+        _stockData,
+        _expandedItems,
+        _selectedFirm
+    ) { items, firms, stockData, expandedIds, selectedFirm ->
+        items.map { item ->
+            val firmStocks = firms.map { firm ->
+                val qty = stockData[item.itemId]?.get(firm.firmId) ?: 0
+                FirmStock(firm.firmId, firm.nickName, qty)
+            }.filter { 
+                // If a firm is selected, only show stock for that firm
+                selectedFirm == null || it.firmId == selectedFirm.firmId 
+            }
+
+            val totalStock = firmStocks.sumOf { it.stockQty }
+            
+            ItemUiModel(
+                item = item,
+                totalStock = totalStock,
+                firmStocks = firmStocks,
+                isExpanded = expandedIds.contains(item.itemId)
+            )
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
 
     /* ---------- FORM ---------- */
 
@@ -47,7 +98,12 @@ class ItemViewModel @Inject constructor(
     val uiEvent = _uiEvent.asSharedFlow()
 
     val isFormValid =
-        formState.map { it.errors.isEmpty() }
+        formState.map { 
+            it.errors.isEmpty() && 
+            it.name.isNotBlank() && 
+            it.hsnCode.isNotBlank() && 
+            it.unit.isNotBlank()
+        }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
@@ -55,22 +111,68 @@ class ItemViewModel @Inject constructor(
             )
 
     init {
-        loadItems()
+        loadData()
     }
 
-    fun loadItems() {
+    fun loadData() {
         viewModelScope.launch {
-            when (val r = repository.getAllItems()) {
-                is Result.Success -> _items.value = r.data
-                is Result.Error -> _items.value = emptyList()
+            // Load Items
+            launch {
+                when (val r = repository.getAllItems()) {
+                    is Result.Success -> {
+                        _items.value = r.data
+                        generateMockStock(r.data) // Generate mock stock when items load
+                    }
+                    is Result.Error -> _items.value = emptyList()
+                }
+            }
+            // Load Firms
+            launch {
+                when (val r = firmRepository.getAllFirms()) {
+                    is Result.Success -> _firms.value = r.data
+                    is Result.Error -> _firms.value = emptyList()
+                }
             }
         }
+    }
+    
+    // Helper to generate random mock stock
+    private fun generateMockStock(items: List<Item>) {
+         val currentFirms = _firms.value
+         if(currentFirms.isEmpty()) return
+
+         val newStockData = items.associate { item ->
+             item.itemId to currentFirms.associate { firm ->
+                 firm.firmId to Random.nextInt(0, 150)
+             }
+         }
+         _stockData.value = newStockData
+    }
+
+    // Call this if firms load AFTER items
+    fun refreshMockStock() {
+        generateMockStock(_items.value)
+    }
+
+    fun toggleItemExpansion(itemId: String) {
+        val current = _expandedItems.value
+        if (current.contains(itemId)) {
+            _expandedItems.value = current - itemId
+        } else {
+            _expandedItems.value = current + itemId
+        }
+    }
+
+    fun selectFirm(firm: Firm?) {
+        _selectedFirm.value = firm
+        // Collapse all items when switching views to avoid confusion
+        _expandedItems.value = emptySet()
     }
 
     fun deleteItem(itemId: String) {
         viewModelScope.launch {
             repository.deleteItem(itemId)
-            loadItems()
+            loadData() // Reload everything
         }
     }
 
@@ -120,7 +222,8 @@ class ItemViewModel @Inject constructor(
             when (result) {
                 is ValidationResult.Valid -> {
                     _formState.value = ItemFormState()
-                    loadItems()
+                    _formState.value = ItemFormState()
+                    loadData()
                     onSuccess()
                 }
                 is ValidationResult.Invalid -> {

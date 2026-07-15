@@ -1,324 +1,251 @@
 package com.dollyplastic.invoiceapp.ui.screens.invoice.H_TransportSection
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.dollyplastic.invoiceapp.data.models.DeliveryType
 import com.dollyplastic.invoiceapp.data.models.TransportDetails
 import com.dollyplastic.invoiceapp.data.models.TransportMode
+import com.dollyplastic.invoiceapp.data.models.VehicleType
+import com.dollyplastic.invoiceapp.ui.common.Cards.InvoiceScreenCommonCard
+import com.dollyplastic.invoiceapp.ui.common.Dropdowns.InvoiceSimpleDropdown
+import com.dollyplastic.invoiceapp.ui.common.TextFields.InvoiceScreenTextField
 import com.dollyplastic.invoiceapp.ui.components.DatePickerField
-
-
-
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-
-import com.dollyplastic.invoiceapp.data.models.*
+import com.dollyplastic.invoiceapp.ui.theme.AppColors
 
 @Composable
 fun InvoiceTransportSection(
     transport: TransportDetails,
     onUpdate: (TransportDetails) -> Unit,
-    errors: Map<String, String>
+    getErrorMessage: (String) -> String?,
+    onBlur: (String) -> Unit,
+    generateEInvoice: Boolean,
+    generateEWayBill: Boolean,
+    isDistanceReadOnly: Boolean
 ) {
-    val t = transport
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    val summaryText = when (transport.deliveryType) {
+        DeliveryType.BUYER_PICKUP -> "Buyer Pickup"
+        DeliveryType.OWN_VEHICLE -> "Own Vehicle - ${transport.vehicleNumber ?: ""}"
+        DeliveryType.TRANSPORTER -> "Via Transporter - ${transport.mode.name}"
+    }
+
+    InvoiceScreenCommonCard(
+        title = "Transport Details",
+        subtitle = summaryText,
+        icon = Icons.Default.LocalShipping,
+        iconColor = Color(0xFF32A852), // Green
+        iconBgColor = Color(0xFF32A852).copy(alpha = 0.1f),
+        isExpandable = true,
+        expanded = expanded,
+        onExpandChange = { expanded = it }
     ) {
-
-        Text(
-            text = "Transport Details",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        /* ---------- DELIVERY TYPE ---------- */
-
-        DeliveryTypeSelector(
-            selected = t.deliveryType,
-            error = errors["deliveryType"],
-            onSelect = { selectedType ->
-                onUpdate(
-                    TransportDetails(
-                        deliveryType = selectedType,
-                        mode = TransportMode.ROAD,
-                        vehicleType =
-                            if (selectedType != DeliveryType.OWN_VEHICLE )
-                                VehicleType.REGULAR
-                            else null,
-                        vehicleNumber = null,
-                        transporterName = null,
-                        transporterId = null,
-                        transporterDocNo = null,
-                        transporterDocDate = null
-                    )
-                )
-            }
-
-        )
-
-        /* ---------- TRANSPORT MODE ---------- */
-
-        if (t.deliveryType == DeliveryType.TRANSPORTER) {
-
-            ModeSelector(
-                selected = t.mode,
-                enabled = t.deliveryType == DeliveryType.TRANSPORTER,
-                error = errors["mode"],
-                onSelect = { mode ->
-                    onUpdate(
-                        t.copy(
-                            mode = mode,
-
-                            // vehicle type only valid for ROAD
-                            vehicleType =
-                                if (mode == TransportMode.ROAD)
-                                    t.vehicleType ?: VehicleType.REGULAR
-                                else
-                                    null,
-
-                            // reset dependent fields
-                            vehicleNumber = null,
-                            transporterDocNo = null,
-                            transporterDocDate = null,
-
-                            // default transporter name for non-road modes
-                            transporterName =
-                                if (mode != TransportMode.ROAD)
-                                    mode.name
-                                else
-                                    t.transporterName
-                        )
-                    )
-                }
-            )
-
-        }
-
-        /* ---------- VEHICLE TYPE (ROAD ONLY) ---------- */
-
-        if (
-            t.mode == TransportMode.ROAD &&
-            t.deliveryType != DeliveryType.BUYER_PICKUP
+        Column(
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            VehicleTypeSelector(
-                selected = t.vehicleType,
-                onSelect = {
-                    onUpdate(t.copy(vehicleType = it))
-                },
-                error = errors["vehicleType"]
-            )
-        }
 
-        /* ---------- OWN VEHICLE ---------- */
-
-        if (t.deliveryType == DeliveryType.OWN_VEHICLE) {
-
-            OutlinedTextField(
-                value = t.vehicleNumber ?: "",
-                onValueChange = {
-                    onUpdate(t.copy(vehicleNumber = it))
-                },
-                label = { Text("Vehicle Number*") },
-                modifier = Modifier.fillMaxWidth(),
-                isError = errors["vehicleNumber"] != null,
-                supportingText = {
-                    errors["vehicleNumber"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            )
-        }
-
-        /* ---------- TRANSPORTER ---------- */
-
-        if (t.deliveryType == DeliveryType.TRANSPORTER) {
-
-            OutlinedTextField(
-                value = t.transporterName ?: "",
-                onValueChange = {
-                    onUpdate(t.copy(transporterName = it))
-                },
-                label = { Text("Transporter Name*") },
-                isError = errors["transporterName"] != null,
-                supportingText = {
-                    errors["transporterName"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = t.transporterId ?: "",
-                onValueChange = {
-                    onUpdate(t.copy(transporterId = it))
-                },
-                label = { Text("Transporter ID*") },
-                isError = errors["transporterId"] != null,
-                supportingText = {
-                    errors["transporterId"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = t.transporterDocNo ?: "",
-                onValueChange = {
-                    onUpdate(t.copy(transporterDocNo = it))
-                },
-                label = {
-                    Text(transporterDocLabel(t.mode))
-                },
-                isError = errors["transporterDocNo"] != null,
-                supportingText = {
-                    errors["transporterDocNo"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            DatePickerField(
-                value = t.transporterDocDate ?: "",
-                label = "Document Date*",
-                onDateSelected = {
-                    onUpdate(t.copy(transporterDocDate = it))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            errors["transporterDocDate"]?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-
-            if (t.mode == TransportMode.ROAD) {
-                OutlinedTextField(
-                    value = t.vehicleNumber ?: "",
+            /* ---------- DISTANCE (Conditional) ---------- */
+            if (generateEInvoice || generateEWayBill) {
+                InvoiceScreenTextField(
+                    value = if (transport.distance > 0) transport.distance.toString() else "",
                     onValueChange = {
-                        onUpdate(t.copy(vehicleNumber = it))
+                        if (it.all { char -> char.isDigit() }) {
+                            val dist = it.toIntOrNull() ?: 0
+                            onUpdate(transport.copy(distance = dist))
+                        }
                     },
-                    label = { Text("Vehicle Number*") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Distance (Km)",
+                    isReadOnly = isDistanceReadOnly,
+                    isError = getErrorMessage("distance") != null,
+                    errorMessage = getErrorMessage("distance"),
+                    onBlur = { onBlur("distance") },
+                    trailingIcon = if (isDistanceReadOnly) {
+                        { Icon(Icons.Default.Lock, contentDescription = "Auto-calculated", tint = AppColors.TextSecondary) }
+                    } else null
                 )
             }
-        }
-    }
-}
 
+            Text("Delivery Type", style = MaterialTheme.typography.labelLarge, color = AppColors.TextSecondary)
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun DeliveryTypeSelector(
-    selected: DeliveryType,
-    error: String?,
-    onSelect: (DeliveryType) -> Unit
-) {
-    Column {
-        Text("Delivery Type")
+            /* ---------- DELIVERY TYPE RADIOS ---------- */
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val availableTypes = if (generateEInvoice || generateEWayBill) {
+                    DeliveryType.entries.filter { it != DeliveryType.BUYER_PICKUP }
+                } else {
+                    DeliveryType.entries.toList()
+                }
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            DeliveryType.entries.forEach { type ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = selected == type,
-                        onClick = { onSelect(type) }
+                availableTypes.forEach { type ->
+                    TransportModeRadioCard(
+                        label = type.name.replace("_", " "),
+                        selected = transport.deliveryType == type,
+                        onClick = {
+                            onUpdate(
+                                TransportDetails(
+                                    deliveryType = type,
+                                    mode = TransportMode.ROAD,
+                                    vehicleType = if (type == DeliveryType.OWN_VEHICLE) VehicleType.REGULAR else if (type == DeliveryType.TRANSPORTER) VehicleType.REGULAR else null,
+                                    vehicleNumber = null,
+                                    transporterName = null,
+                                    transporterId = null,
+                                    transporterDocNo = null,
+                                    transporterDocDate = null,
+                                    distance = transport.distance // Preserve distance
+                                )
+                            )
+                        }
                     )
-                    Text(type.name.replace("_", " "))
                 }
             }
 
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+            /* ---------- CONDITIONAL FIELDS ---------- */
+            
+            // OWN VEHICLE FIELDS
+            if (transport.deliveryType == DeliveryType.OWN_VEHICLE) {
+                
+                // Vehicle Type Dropdown
+                InvoiceSimpleDropdown(
+                    label = "Vehicle Type",
+                    items = VehicleType.entries,
+                    selectedItem = transport.vehicleType,
+                    onItemSelected = { type ->
+                        onUpdate(transport.copy(vehicleType = type))
+                    },
+                    itemLabel = { it.name },
+                    isError = getErrorMessage("vehicleType") != null,
+                    errorMessage = getErrorMessage("vehicleType")
+                )
+
+                InvoiceScreenTextField(
+                    value = transport.vehicleNumber ?: "",
+                    onValueChange = { onUpdate(transport.copy(vehicleNumber = it)) },
+                    label = "Vehicle Number*",
+                    isError = getErrorMessage("vehicleNumber") != null,
+                    errorMessage = getErrorMessage("vehicleNumber"),
+                    onBlur = { onBlur("vehicleNumber") }
                 )
             }
-        }
-    }
-}
 
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun ModeSelector(
-    selected: TransportMode,
-    enabled: Boolean,
-    error: String?,
-    onSelect: (TransportMode) -> Unit
-) {
-    Column {
-        Text("Transport Mode")
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TransportMode.entries.forEach { mode ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = selected == mode,
-                        enabled = enabled,
-                        onClick = { onSelect(mode) }
+            // TRANSPORTER FIELDS
+            if (transport.deliveryType == DeliveryType.TRANSPORTER) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    
+                    // Transport Mode Dropdown
+                    InvoiceSimpleDropdown(
+                        label = "Transport Mode",
+                        items = TransportMode.entries,
+                        selectedItem = transport.mode,
+                        onItemSelected = { mode ->
+                            onUpdate(
+                                transport.copy(
+                                    mode = mode,
+                                    vehicleType = if (mode == TransportMode.ROAD) transport.vehicleType ?: VehicleType.REGULAR else null,
+                                    vehicleNumber = null,
+                                    transporterDocNo = null,
+                                    transporterDocDate = null,
+                                    transporterName = if (mode != TransportMode.ROAD) mode.name else transport.transporterName
+                                )
+                            )
+                        },
+                        itemLabel = { it.name },
+                        isRequired = true,
+                        isError = getErrorMessage("mode") != null,
+                        errorMessage = getErrorMessage("mode")
                     )
-                    Text(mode.name)
-                }
-            }
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
 
+                    // Vehicle Type Dropdown (Road Only)
+                    if (transport.mode == TransportMode.ROAD) {
+                         InvoiceSimpleDropdown(
+                            label = "Vehicle Type",
+                            items = VehicleType.entries,
+                            selectedItem = transport.vehicleType,
+                            onItemSelected = { type ->
+                                onUpdate(transport.copy(vehicleType = type))
+                            },
+                            itemLabel = { it.name },
+                            isError = getErrorMessage("vehicleType") != null,
+                            errorMessage = getErrorMessage("vehicleType")
+                        )
+                    }
 
-@Composable
-fun VehicleTypeSelector(
-    selected: VehicleType?,
-    error: String?,
-    onSelect: (VehicleType) -> Unit
-) {
-    Column {
-        Text("Vehicle Type")
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            VehicleType.entries.forEach {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = selected == it,
-                        onClick = { onSelect(it) }
+                    // Transporter Name & ID
+                    InvoiceScreenTextField(
+                        value = transport.transporterName ?: "",
+                        onValueChange = { onUpdate(transport.copy(transporterName = it)) },
+                        label = "Transporter Name*",
+                        isError = getErrorMessage("transporterName") != null,
+                        errorMessage = getErrorMessage("transporterName"),
+                        onBlur = { onBlur("transporterName") }
                     )
-                    Text(it.name)
+
+                    InvoiceScreenTextField(
+                        value = transport.transporterId ?: "",
+                        onValueChange = { onUpdate(transport.copy(transporterId = it)) },
+                        label = "Transporter ID*",
+                        isError = getErrorMessage("transporterId") != null,
+                        errorMessage = getErrorMessage("transporterId"),
+                        onBlur = { onBlur("transporterId") }
+                    )
+
+                    // Doc No & Date
+                    InvoiceScreenTextField(
+                        value = transport.transporterDocNo ?: "",
+                        onValueChange = { onUpdate(transport.copy(transporterDocNo = it)) },
+                        label = transporterDocLabel(transport.mode),
+                        isError = getErrorMessage("transporterDocNo") != null,
+                        errorMessage = getErrorMessage("transporterDocNo"),
+                        onBlur = { onBlur("transporterDocNo") }
+                    )
+
+                    // Date Picker (Custom param needed in InvoiceScreenTextField or keep custom?)
+                    // The existing code used DatePickerField. I'll stick to DatePickerField for now but maybe wrap it ?
+                    // Actually, DatePickerField is a separate component. I should check if it fits the style.
+                    // Assuming DatePickerField matches reasonably well or I'll just use it as is.
+                     DatePickerField(
+                        value = transport.transporterDocDate ?: "",
+                        label = "Document Date*",
+                        onDateSelected = { onUpdate(transport.copy(transporterDocDate = it)) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                     // Error for date
+                    getErrorMessage("transporterDocDate")?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp))
+                    }
+
+                    // Vehicle Number (Road Only)
+                    if (transport.mode == TransportMode.ROAD) {
+                        InvoiceScreenTextField(
+                            value = transport.vehicleNumber ?: "",
+                            onValueChange = { onUpdate(transport.copy(vehicleNumber = it)) },
+                            label = "Vehicle Number*",
+                            isError = getErrorMessage("vehicleNumber") != null,
+                            errorMessage = getErrorMessage("vehicleNumber"),
+                            onBlur = { onBlur("vehicleNumber") }
+                        )
+                    }
                 }
-            }
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                )
             }
         }
     }
@@ -330,14 +257,6 @@ private fun transporterDocLabel(mode: TransportMode): String =
         TransportMode.RAIL -> "Railway Receipt No*"
         TransportMode.AIR  -> "Airway Bill No*"
         TransportMode.SHIP -> "Bill of Lading No*"
-    }
-
-private fun defaultTransporterName(mode: TransportMode): String =
-    when (mode) {
-        TransportMode.ROAD -> ""
-        TransportMode.RAIL -> "Indian Railways"
-        TransportMode.AIR  -> "Air Cargo"
-        TransportMode.SHIP -> "Shipping Line"
     }
 
 

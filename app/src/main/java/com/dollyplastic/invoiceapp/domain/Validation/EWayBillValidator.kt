@@ -1,6 +1,6 @@
 package com.dollyplastic.invoiceapp.domain.Validation
 
-import com.dollyplastic.invoiceapp.domain.EwayBill.EWayBillDraft
+import com.dollyplastic.invoiceapp.domain.Compliance.EwayBill.EWayBillDraft
 
 object EWayBillValidator {
 

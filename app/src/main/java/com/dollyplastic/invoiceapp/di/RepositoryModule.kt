@@ -1,49 +1,51 @@
 package com.dollyplastic.invoiceapp.di
 
-import com.dollyplastic.invoiceapp.data.repository.FirmRepository
-import com.dollyplastic.invoiceapp.data.repository.FirmRepositoryImpl
-import com.dollyplastic.invoiceapp.data.repository.InvoiceRepository
-import com.dollyplastic.invoiceapp.data.repository.InvoiceRepositoryImpl
-import com.dollyplastic.invoiceapp.data.repository.ItemRepository
-import com.dollyplastic.invoiceapp.data.repository.ItemRepositoryImpl
-import com.dollyplastic.invoiceapp.data.repository.PartyRepository
-import com.dollyplastic.invoiceapp.data.repository.PartyRepositoryImpl
-import com.google.firebase.firestore.FirebaseFirestore
+import com.dollyplastic.invoiceapp.data.repository.*
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object RepositoryModule {
+abstract class RepositoryModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideFirmRepository(
-        firestore: FirebaseFirestore
-    ): FirmRepository =
-        FirmRepositoryImpl(firestore)
+    abstract fun bindFirmRepository(
+        impl: OfflineFirstFirmRepository
+    ): FirmRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun providePartyRepository(
-        firestore: FirebaseFirestore
-    ): PartyRepository =
-        PartyRepositoryImpl(firestore)
+    abstract fun bindPartyRepository(
+        impl: OfflineFirstPartyRepository
+    ): PartyRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideItemRepository(
-        firestore: FirebaseFirestore
-    ): ItemRepository =
-        ItemRepositoryImpl(firestore)
+    abstract fun bindItemRepository(
+        impl: OfflineFirstItemRepository
+    ): ItemRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideInvoiceRepository(
-        firestore: FirebaseFirestore
-    ): InvoiceRepository =
-        InvoiceRepositoryImpl(firestore)
+    abstract fun bindInvoiceRepository(
+        impl: OfflineFirstInvoiceRepository
+    ): InvoiceRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindConfigRepository(
+        impl: OfflineFirstConfigRepository
+    ): ConfigRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDistanceRepository(
+        impl: OfflineFirstDistanceRepository
+    ): DistanceRepository
+
+
 }

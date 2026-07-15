@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.InvoiceApp" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.InvoiceApp.Launch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFFFFF</item> <!-- white -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#FFFFFF</item>
+
+        <item name="postSplashScreenTheme">@style/Theme.InvoiceApp</item>
+    </style>
 </resources>
+

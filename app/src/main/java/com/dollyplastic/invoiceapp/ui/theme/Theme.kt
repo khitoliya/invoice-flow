@@ -10,6 +10,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.Typography
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -40,19 +41,21 @@ fun InvoiceAppTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = lightColorScheme(
+        background = AppColors.Background,
+        onBackground = AppColors.Foreground,
+        primary = AppColors.Primary,
+        onPrimary = AppColors.PrimaryForeground,
+        error = AppColors.Destructive
+    )
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = Typography(
+            bodyLarge = AppText.Body,
+            bodyMedium = AppText.BodySmall,
+            labelLarge = AppText.Label
+        ),
         content = content
     )
 }

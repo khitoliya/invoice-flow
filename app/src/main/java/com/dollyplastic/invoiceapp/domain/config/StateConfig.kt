@@ -2,9 +2,9 @@ package com.dollyplastic.invoiceapp.domain.config
 
 
 data class IndianState(
-    val name: String,
-    val code: String,
-    val isUnionTerritory: Boolean
+    val name: String = "",
+    val code: String = "",
+    val isUnionTerritory: Boolean = false
 )
 
 object StateConfig {
